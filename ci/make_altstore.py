@@ -21,8 +21,8 @@ ICON_PATH = "musemobile-ios/MuseMobileiOS/Assets.xcassets/AppIcon.appiconset/ico
 
 p = argparse.ArgumentParser()
 p.add_argument("--ipa", required=True, help="path to signed .ipa")
-p.add_argument("--user", required=True, help="GitHub user/org")
-p.add_argument("--repo", required=True, help="GitHub repo for the iOS project")
+p.add_argument("--user", default="ThinuxBOOM", help="GitHub user/org")
+p.add_argument("--repo", default="musemobile-ios", help="GitHub repo for the iOS project")
 p.add_argument("--tag", required=True, help="release tag, e.g. v1.1.4-ios-smoke1")
 p.add_argument("--out", default="altstore/apps.json")
 a = p.parse_args()

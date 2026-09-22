@@ -40,30 +40,49 @@ MuseMobileiOS/
 
 ## Bring-up (Xcode, macOS)
 
-1. Open `MuseMobileiOS.xcodeproj` (shared scheme `MuseMobileiOS` included) or
-   run `sh ci/smoke.sh` for an unsigned `CODE_SIGNING_ALLOWED=NO` build check.
-2. Set your Team for device install (bundle `com.musemobile.ios`).
-3. Build & run on device (Spotify web player needs real network + cookies).
+```sh
+git clone https://github.com/ThinuxBOOM/musemobile-ios
+cd musemobile-ios
+sh ci/smoke.sh   # unsigned build check, no signing needed
+```
+
+1. Open `MuseMobileiOS.xcodeproj` in Xcode → `MuseMobileiOS` target →
+   Signing & Capabilities → pick your Team (free Apple ID works).
+2. iPhone (iOS 16+): Settings → Privacy & Security → enable **Developer Mode**,
+   restart, confirm. Plug in via cable, select the iPhone → **Run**.
+3. iPhone: Settings → General → VPN & Device Management → trust your Apple ID.
+4. Log into Spotify, play one track. If this works, the build is good — proceed
+   to the release below.
 
 ## Ship to iPhone (sideload — no App Store)
 
 Tapping an IPA in Safari installs nothing. iOS needs a **signed** app
-installed via Xcode/AltStore. Fastest smoke path is a cable install
-(§Bring-up). For a GitHub release others can install:
+installed via Xcode/AltStore. Cable-install first (§Bring-up); then:
 
-1. Push + tag: `git add -A && git commit -m "ios smoke-1" && git push`,
-   `git tag v1.1.4-ios-smoke1 && git push --tags`
-2. On macOS: put your Team ID in `ci/exportOptions-development.plist`
-   (`YOUR_TEAM_ID`), then `TEAM_ID=... sh ci/archive.sh development`
-   → `build/export/MuseMobileiOS.ipa`
-3. `python3 ci/make_altstore.py --ipa build/export/MuseMobileiOS.ipa --user <you> --repo <ios-repo> --tag v1.1.4-ios-smoke1`
-   → `altstore/apps.json` (size + date auto-filled); commit + push
+1. Build the signed IPA (macOS). Put your Team ID
+   (developer.apple.com → Membership, 10 chars) in
+   `ci/exportOptions-development.plist` (`YOUR_TEAM_ID`), then:
+   ```sh
+   TEAM_ID=<your-id> sh ci/archive.sh development
+   # → build/export/MuseMobileiOS.ipa
+   ```
+   Use `ad-hoc` instead of `development` for multi-device (register each
+   UDID in the portal first).
+2. Tag: `git tag v1.1.4-ios-smoke1 && git push --tags`
+3. Generate the AltStore source (size + date auto-filled), commit + push:
+   ```sh
+   python3 ci/make_altstore.py --ipa build/export/MuseMobileiOS.ipa \
+     --tag v1.1.4-ios-smoke1
+   git add altstore/apps.json && git commit -m "altstore source" && git push
+   ```
+   (`--user`/`--repo` default to `ThinuxBOOM`/`musemobile-ios`.)
 4. GitHub → Releases → New (tag `v1.1.4-ios-smoke1`) → attach the `.ipa`
-   (+ `RELEASE_NOTES_1.1.4-ios-smoke1.md` body)
+   (+ `RELEASE_NOTES_1.1.4-ios-smoke1.md` body) → Publish.
+   Release page: https://github.com/ThinuxBOOM/musemobile-ios/releases
 5. iPhone: install AltStore (AltServer on PC, same Wi-Fi, Apple ID), add source
-   `https://raw.githubusercontent.com/<you>/<ios-repo>/main/altstore/apps.json`,
+   `https://raw.githubusercontent.com/ThinuxBOOM/musemobile-ios/main/altstore/apps.json`,
    install MuseMobile. Free IDs: 3-app limit, 7-day refresh via AltServer.
-   Enable Developer Mode first (Settings → Privacy & Security, iOS 16+).
+   Then work through `SMOKE_TEST.md` §1–6.
 
 ## Contracts preserved
 
