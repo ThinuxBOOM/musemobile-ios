@@ -1,4 +1,4 @@
-# MuseMobile iOS — Rebuild Scaffold (v1.1.4 / build 14)
+# MuseMobile iOS (v1.1.4 / build 14)
 
 Swift/SwiftUI + WKWebView port of [musemobile](https://github.com/ThinuxBOOM/musemobile)
 (Android: Kotlin, WebView wrapping `https://open.spotify.com/`).
