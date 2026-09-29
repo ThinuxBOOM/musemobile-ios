@@ -33,7 +33,7 @@ node_ok = True
 try:
     subprocess.run(["node", "--version"], capture_output=True, check=True)
 except Exception:
-    print("SKIP node --check (node not installed)")
+    fail("node not installed: install node to run `node --check` on bundled JS")
     node_ok = False
 if node_ok:
     for f in js_files:
@@ -61,7 +61,13 @@ for case in sorted(swift_cases - shim_methods):
     fail(f"Swift case '{case}' missing from shim METHODS")
 
 # ---- 3. injection order coverage ----
+# Array payloads (pageStart/playerStack) plus dynamic loads via
+# InjectionLoader.jsResource("...") / Bundle.main.url(forResource: "...")
+# in InjectionLoader.swift + SpotifyWebView.swift. The dynamic set covers
+# BrowserSpoof, GoogleSpoof, FbGdprBypass, ClassicLoginButton,
+# LoginDetection, LogoutCheck, __BridgeShim.
 loader = (APP / "WebView" / "InjectionLoader.swift").read_text(encoding="utf-8")
+webview = (APP / "WebView" / "SpotifyWebView.swift").read_text(encoding="utf-8")
 names = re.findall(r'"([A-Z][A-Za-z]+)"', loader)
 # keep only known payload names (drop unrelated string literals by requiring a js file or list membership)
 on_disk = {p.stem for p in js_files}
@@ -73,6 +79,42 @@ for name in sorted(set(names)):
         # only flag if it appears inside the pageStart/playerStack array regions
         fail(f"payload '{name}' referenced in InjectionLoader but no {name}.js on disk")
 print(f"injection names checked: {len(set(names))}")
+
+# ---- 3b. dynamic jsResource / Bundle.main.url coverage ----
+dynamic_refs: set[str] = set()
+for src in (loader, webview):
+    # jsResource("Name") direct calls
+    dynamic_refs.update(re.findall(r'jsResource\(\s*"(\w+)"\s*\)', src))
+    # jsResource(cond ? "A" : "B") ternary (BrowserSpoof/GoogleSpoof)
+    for mjs in re.finditer(r"jsResource\(([^)]*)\)", src):
+        dynamic_refs.update(re.findall(r'"(\w+)"', mjs.group(1)))
+    # Bundle.main.url/path(forResource: "Name", ...) (__BridgeShim)
+    dynamic_refs.update(re.findall(r'forResource:\s*"(\w+)"', src))
+array_names = set(re.findall(r'"([A-Z][A-Za-z0-9_]+)"', loader)) & on_disk
+referenced = (array_names | dynamic_refs) - {"JS"}
+print(f"dynamic jsResource/Bundle refs: {sorted(dynamic_refs)}")
+for name in sorted(referenced):
+    if (JS / f"{name}.js").is_file():
+        continue
+    # Only flag names that look like payloads (CamelCase / dunder); skip
+    # unrelated literals that happened to match (e.g. directory names).
+    if re.fullmatch(r"(?:__)?[A-Z][A-Za-z0-9_]*", name):
+        fail(f"dynamic payload '{name}' has no Resources/JS/{name}.js on disk")
+
+# ---- 3c. every bundled resource must be in the Xcode Resources phase ----
+pbxproj = (ROOT / "MuseMobileiOS.xcodeproj" / "project.pbxproj").read_text(encoding="utf-8")
+for f in js_files:
+    if f"{f.name} in Resources" not in pbxproj:
+        fail(f"{f.name} not in project.pbxproj Resources phase")
+if "silent.wav in Resources" not in pbxproj:
+    fail("silent.wav not in project.pbxproj Resources phase")
+print("pbxproj Resources phase checked")
+
+# ---- 3d. orphan .js files (on disk, referenced nowhere) ----
+orphans = sorted(on_disk - referenced)
+for name in orphans:
+    fail(f"orphan {name}.js: on disk but referenced nowhere (arrays, jsResource, Bundle)")
+print(f"orphan check done ({len(orphans)} orphan(s))")
 
 # ---- 4. theme element ids ----
 theme = (APP / "WebView" / "ThemeJS.swift").read_text(encoding="utf-8")

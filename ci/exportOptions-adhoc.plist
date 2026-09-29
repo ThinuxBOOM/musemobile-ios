@@ -6,7 +6,6 @@
     <key>method</key><string>ad-hoc</string>
     <!-- Replace with your 10-char Team ID (Apple Developer portal → Membership). -->
     <key>teamID</key><string>YOUR_TEAM_ID</string>
-    <key>compileBitcode</key><false/>
     <key>destination</key><string>export</string>
     <key>signingStyle</key><string>automatic</string>
     <key>stripSwiftSymbols</key><true/>

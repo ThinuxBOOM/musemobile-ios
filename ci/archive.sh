@@ -1,8 +1,8 @@
 #!/bin/sh
 # Archive + export a signed IPA for sideloading (macOS + Xcode required).
 # Usage:
-#   TEAM_ID=ABCDE12345 sh ci/archive.sh [development|ad-hoc]
-# Output: build/MuseMobileiOS.ipa  → attach to the GitHub release.
+#   TEAM_ID=ABCDE12345 sh ci/archive.sh [development|ad-hoc|adhoc]
+# Output: build/export/MuseMobileiOS.ipa  → attach to the GitHub release.
 set -e
 METHOD="${1:-development}"
 if [ -z "$TEAM_ID" ]; then
@@ -10,10 +10,32 @@ if [ -z "$TEAM_ID" ]; then
   echo "  TEAM_ID=ABCDE12345 sh ci/archive.sh development"
   exit 1
 fi
+case "$TEAM_ID" in
+  *[!A-Z0-9]*)
+    echo "ERROR: TEAM_ID must match ^[A-Z0-9]{10}$ (got '$TEAM_ID')" >&2
+    exit 1
+    ;;
+esac
+if [ "${#TEAM_ID}" -ne 10 ]; then
+  echo "ERROR: TEAM_ID must match ^[A-Z0-9]{10}$ (got '$TEAM_ID')" >&2
+  exit 1
+fi
+case "$METHOD" in
+  development)
+    PLIST="ci/exportOptions-development.plist"
+    ;;
+  ad-hoc|adhoc)
+    PLIST="ci/exportOptions-adhoc.plist"
+    ;;
+  *)
+    echo "ERROR: METHOD must be one of development|ad-hoc|adhoc (got '$METHOD')" >&2
+    exit 1
+    ;;
+esac
 cd "$(dirname "$0")/.."
-sed "s/YOUR_TEAM_ID/$TEAM_ID/" "ci/exportOptions-$METHOD.plist" > build/exportOptions.plist 2>/dev/null || {
+sed "s/YOUR_TEAM_ID/$TEAM_ID/" "$PLIST" > build/exportOptions.plist 2>/dev/null || {
   mkdir -p build
-  sed "s/YOUR_TEAM_ID/$TEAM_ID/" "ci/exportOptions-$METHOD.plist" > build/exportOptions.plist
+  sed "s/YOUR_TEAM_ID/$TEAM_ID/" "$PLIST" > build/exportOptions.plist
 }
 xcodebuild archive \
   -project MuseMobileiOS.xcodeproj \

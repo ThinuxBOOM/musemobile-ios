@@ -102,8 +102,9 @@ Two paths — pick one:
    TEAM_ID=<your-id> sh ci/archive.sh development
    # → build/export/MuseMobileiOS.ipa
    ```
-   Use `ad-hoc` instead of `development` for multi-device (register each
-   UDID in the portal first).
+    Use `adhoc` (or `ad-hoc`, same thing — both resolve to
+    `ci/exportOptions-adhoc.plist`) instead of `development` for multi-device
+    (register each UDID in the portal first).
 2. Tag: `git tag v1.1.4-ios-smoke1 && git push --tags`
 3. Generate the AltStore source (size + date auto-filled), commit + push:
    ```sh
