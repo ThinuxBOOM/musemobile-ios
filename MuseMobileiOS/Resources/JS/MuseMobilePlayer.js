@@ -362,5 +362,10 @@
                 var npb=document.querySelector('aside[data-testid="now-playing-bar"]');
                 if(npb&&npb.style.display!=='none') initMuseMobilePlayer();
             },3000);
+            if(!document.getElementById('spl-timer-css')){
+                var splTimerCss=document.createElement('style');splTimerCss.id='spl-timer-css';
+                splTimerCss.textContent='#musemobilePlayerControls #spl-timer.spl-active{background:var(--spl-accent,#1db954)!important;color:#000!important}';
+                var splTimerHead=document.head||document.documentElement;if(splTimerHead)splTimerHead.appendChild(splTimerCss);
+            }
         
     

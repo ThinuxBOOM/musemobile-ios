@@ -35,8 +35,19 @@ struct MainView: View {
                 Button("Settings") { showSettings = true }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Timer") { model.startSleep(minutes: 30) }
+                Button("Timer") { model.sleepInput = "30"; model.showSleepDialog = true }
             }
+        }
+        .alert("Sleep Timer", isPresented: $model.showSleepDialog) {
+            TextField("Minutes (5–180)", text: $model.sleepInput)
+                .keyboardType(.numberPad)
+            Button("Start") { model.confirmSleep() }
+            if model.sleepActive {
+                Button("Cancel Timer", role: .destructive) { model.cancelSleep() }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Stop playback after 5–180 minutes (default 30).")
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
     }
@@ -45,23 +56,62 @@ struct MainView: View {
 final class MainViewModel: ObservableObject {
     let bridge = SpotifyBridge()
     private var sleepWork: DispatchWorkItem?
+    @Published var showSleepDialog = false
+    @Published var sleepInput = "30"
+    @Published var sleepActive = false
 
     func wire() {
-        bridge.onTimerDialog = { [weak self] in self?.startSleep(minutes: 30) }
+        bridge.onLoginDetected = { [weak self] in
+            DispatchQueue.main.async {
+                if let wv = self?.bridge.webView {
+                    wv.load(URLRequest(url: Constants.spotifyHome))
+                }
+            }
+        }
+        bridge.onPlayLoaded = {
+            // no-op hook: play control is wired page-side (wirePlayBtn);
+            // reserved for future badge/artwork refresh.
+        }
+        bridge.onEnterPip = {
+            // PiP stub: no WebViewBus.eval here; future AVKit work observes .requestPip.
+            NotificationCenter.default.post(name: .requestPip, object: nil)
+        }
+        bridge.onEnterPipVideo = { w, h in
+            // PiP-video stub: no WebViewBus.eval here; future AVKit work observes .requestPip.
+            NotificationCenter.default.post(name: .requestPip, object: nil, userInfo: ["w": w, "h": h])
+        }
+        bridge.onTimerDialog = { [weak self] in
+            DispatchQueue.main.async { self?.showSleepDialog = true }
+        }
         bridge.onDownloadTrack = { DownloadManager.shared.downloadTrack(json: $0) }
         bridge.onDownloadCollection = { DownloadManager.shared.downloadCollection(json: $0) }
     }
 
+    func confirmSleep() {
+        let m = Int(sleepInput.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 30
+        guard (5...180).contains(m) else { sleepInput = "30"; return }
+        showSleepDialog = false
+        startSleep(minutes: m)
+    }
+
     func startSleep(minutes: Int) {
-        sleepWork?.cancel()
-        let w = DispatchWorkItem { WebViewBus.eval("actPlayPause(false)") }
+        cancelSleep()
+        sleepActive = true
+        let w = DispatchWorkItem { [weak self] in
+            WebViewBus.eval("actPlayPause(false)")
+            WebViewBus.eval("if(window.timerBtn)timerBtn.style.color='';var t=document.getElementById('spl-timer');if(t)t.classList.remove('spl-active');")
+            DispatchQueue.main.async { self?.sleepActive = false }
+        }
         sleepWork = w
         DispatchQueue.main.asyncAfter(deadline: .now() + Double(minutes * 60), execute: w)
-        WebViewBus.eval("if(window.timerBtn)window.timerBtn.classList.add('spl-timer');")
+        WebViewBus.eval("if(window.timerBtn)timerBtn.style.color='var(--spl-accent,#2d6)';var t=document.getElementById('spl-timer');if(t)t.classList.add('spl-active');")
     }
 
     func cancelSleep() {
         sleepWork?.cancel(); sleepWork = nil
-        WebViewBus.eval("if(window.timerBtn)window.timerBtn.classList.remove('spl-timer');")
+        sleepActive = false
+        WebViewBus.eval("if(window.timerBtn)timerBtn.style.color='';var t=document.getElementById('spl-timer');if(t)t.classList.remove('spl-active');")
     }
 }
+
+extension Notification.Name { static let requestPip = Notification.Name("requestPip") }
