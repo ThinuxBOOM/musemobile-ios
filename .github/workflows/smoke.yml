@@ -7,6 +7,26 @@ on:
   workflow_dispatch:
 
 jobs:
+  checks:
+    # Hardware-free unit layers: JS/bridge consistency + Swift logic tests
+    # compiled against the real sources (no Xcode project changes needed).
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Consistency checks
+        run: python3 ci/check_consistency.py
+      - name: Swift logic tests
+        run: |
+          swiftc -o /tmp/logictests \
+            MuseMobileiOS/WebView/AdIdStore.swift \
+            MuseMobileiOS/WebView/AdBlocker.swift \
+            MuseMobileiOS/Core/JSStripper.swift \
+            MuseMobileiOS/Updater/Updater.swift \
+            MuseMobileiOS/Core/AppSettings.swift \
+            MuseMobileiOS/Core/Constants.swift \
+            MuseMobileiOS/Offline/OfflineStore.swift \
+            ci/logic_tests/LogicTestsMain.swift
+          /tmp/logictests
   build:
     # Unsigned build + IPA packaging (no Team, no signing). Sideloadly /
     # AltStore re-sign the unsigned IPA on install with your own Apple ID,

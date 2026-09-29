@@ -96,6 +96,17 @@ Two paths — pick one:
    install MuseMobile. Free IDs: 3-app limit, 7-day refresh via AltServer.
    Then work through `SMOKE_TEST.md` §1–6.
 
+## Hardware-free test layers (CI, no iPhone/Mac needed)
+
+| Job | What it proves |
+|---|---|
+| `checks` → `ci/check_consistency.py` | all 39 JS parse; 24 shim methods ↔ 23 Swift cases (+1 documented JS-only stub); every injected name has a file; theme IDs present |
+| `checks` → `swiftc` logic tests | AdIdStore validation/LRU/clear, adblock never-block rule + pipeline order, `stripConsoleLogs` edge cases, per-segment version compare, filename sanitize, prefs defaults, retry policy |
+| `build` | full unsigned `.ipa` artifact for Sideloadly |
+| `simtest` | boots iPhone Simulator, launches app, 30s WebView load, screenshot artifact, log-based liveness |
+
+Needs a physical iPhone: login session, audio/DRM playback, lockscreen, adblock behavior, downloads (`SMOKE_TEST.md` §2–5).
+
 ## Contracts preserved
 
 - Entry URLs: logged-in `open.spotify.com/`, logged-out `accounts.spotify.com/login`;
