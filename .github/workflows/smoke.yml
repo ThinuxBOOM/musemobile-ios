@@ -77,14 +77,23 @@ jobs:
           sleep 30
       - name: Screenshot
         run: xcrun simctl io "$SIM_UDID" screenshot screen.png
-      - name: Crash check
+      - name: Crash check (log-based)
+        # NOTE: kill -0 via simctl spawn is unreliable (sim user-namespace
+        # quirk: getpwuid_r fails for the host uid, kill returns EPERM on a
+        # living process). Instead: the running app logs WebKit activity
+        # continuously, so recent MuseMobileiOS lines + no crash markers =
+        # alive. A dead app logs nothing and/or crash-reporter lines.
         run: |
-          if xcrun simctl spawn "$SIM_UDID" sh -c "kill -0 $APP_PID" 2>/dev/null; then
-            echo "APP ALIVE after 30s ✅"
-          else
-            echo "APP DIED ❌ — dumping recent logs"
-            xcrun simctl spawn "$SIM_UDID" log show --last 2m --predicate 'process == "MuseMobileiOS"' --info | tail -100
+          LOGS=$(xcrun simctl spawn "$SIM_UDID" log show --last 45s --predicate 'process == "MuseMobileiOS"' --info 2>/dev/null | tail -60)
+          echo "$LOGS"
+          if echo "$LOGS" | grep -qiE "crashed|EXC_BAD|SIGABRT|SIGSEGV|termination reason|abort\(\)"; then
+            echo "CRASH MARKERS FOUND ❌"
             exit 1
+          elif ! echo "$LOGS" | grep -q "MuseMobileiOS"; then
+            echo "NO RECENT ACTIVITY — app likely died silently ❌"
+            exit 1
+          else
+            echo "APP ALIVE ✅ (recent activity, no crash markers)"
           fi
       - name: Upload screenshot
         if: always()
