@@ -39,3 +39,61 @@ jobs:
         with:
           name: MuseMobileiOS-unsigned
           path: MuseMobileiOS-unsigned.ipa
+
+  simtest:
+    # No-iPhone smoke test: boot an iPhone Simulator on the CI Mac, install
+    # the app, launch it, and capture a screenshot. Proves launch + WebView
+    # load with zero Apple hardware of your own. NOTE: Simulator cannot play
+    # DRM audio or log into Spotify for real — login + playback still need a
+    # physical device (see README §Ship to iPhone).
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 15
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+      - name: Build for Simulator (unsigned)
+        run: |
+          xcodebuild -project MuseMobileiOS.xcodeproj \
+            -scheme MuseMobileiOS \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -derivedDataPath build/SimDerived \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Create + boot Simulator
+        run: |
+          RUNTIME=$(xcrun simctl list runtimes -j | python3 -c "import json,sys; rs=[r for r in json.load(sys.stdin)['runtimes'] if r['name'].startswith('iOS') and r['isAvailable']]; print(sorted(rs, key=lambda r: r['version'])[-1]['identifier'])")
+          echo "Using runtime: $RUNTIME"
+          UDID=$(xcrun simctl create smokesim com.apple.CoreSimulator.SimDeviceType.iPhone-15 "$RUNTIME")
+          echo "SIM_UDID=$UDID" >> $GITHUB_ENV
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+      - name: Install + launch app
+        run: |
+          xcrun simctl install "$SIM_UDID" "build/SimDerived/Build/Products/Debug-iphonesimulator/MuseMobileiOS.app"
+          PID=$(xcrun simctl launch "$SIM_UDID" com.musemobile.ios | awk '{print $NF}')
+          echo "APP_PID=$PID" >> $GITHUB_ENV
+          echo "Launched, pid=$PID — waiting 30s for WebView load…"
+          sleep 30
+      - name: Screenshot
+        run: xcrun simctl io "$SIM_UDID" screenshot screen.png
+      - name: Crash check
+        run: |
+          if xcrun simctl spawn "$SIM_UDID" sh -c "kill -0 $APP_PID" 2>/dev/null; then
+            echo "APP ALIVE after 30s ✅"
+          else
+            echo "APP DIED ❌ — dumping recent logs"
+            xcrun simctl spawn "$SIM_UDID" log show --last 2m --predicate 'process == "MuseMobileiOS"' --info | tail -100
+            exit 1
+          fi
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-screenshot
+          path: screen.png
+      - name: Cleanup
+        if: always()
+        run: |
+          xcrun simctl shutdown "$SIM_UDID" || true
+          xcrun simctl delete "$SIM_UDID" || true
