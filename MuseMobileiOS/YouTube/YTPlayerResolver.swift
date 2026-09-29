@@ -92,7 +92,7 @@ public final class YTPlayerResolver {
         let audios = formats.filter { f in
             let mime = (f["mimeType"] as? String) ?? ""
             if mime.contains("video/") || !mime.contains("audio/") { return false }
-            if let track = (f["audioTrack"] as? [String: Any])["id"] as? String, track.hasSuffix(".dubbed") { return false }
+            if let track = ((f["audioTrack"] as? [String: Any])?["id"] as? String), track.hasSuffix(".dubbed") { return false }
             return true
         }
         guard !audios.isEmpty else { return nil }
