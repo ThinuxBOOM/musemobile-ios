@@ -27,10 +27,12 @@ public final class AdIdStore: @unchecked Sendable {
         return changed
     }
 
-    /// Hot path — lock-free snapshot scan.
+    /// Hot path — snapshot scan (copy reference under lock, scan outside).
     public func matches(_ url: String) -> Bool {
         if url.count < 8 { return false }
+        lock.lock()
         let snap = published
+        lock.unlock()
         for id in snap { if url.contains(id) { return true } }
         return false
     }

@@ -10,6 +10,10 @@ public final class NowPlayingManager {
     private init() { setupCommands() }
 
     public func update(from json: String) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { self.update(from: json) }
+            return
+        }
         guard let data = json.data(using: .utf8),
               let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
         var info: [String: Any] = [:]
@@ -36,6 +40,10 @@ public final class NowPlayingManager {
     }
 
     public func updatePosition(_ ms: Int64) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { self.updatePosition(ms) }
+            return
+        }
         var cur = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
         cur[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(ms) / 1000
         MPNowPlayingInfoCenter.default().nowPlayingInfo = cur

@@ -36,12 +36,12 @@ public enum AdBlocker {
     /// Load-bearing never-block rule: music CDNs must pass through.
     public static func isProtectedMusicURL(_ url: String) -> Bool {
         url.contains("gew4-spclient") || url.contains("podz-content")
-            || url.contains("audio-fa") && url.contains("scdn")
+            || (url.contains("audio-fa") && url.contains("scdn"))
     }
 
     public static func isGoogleAuth(host: String) -> Bool {
         let h = host.lowercased()
-        return h == "google.com" || h.hasSuffix(".google.com") || h.contains(".google.")
-            || h.hasSuffix(".youtube.com") || h == "youtube.com"
+        return h == "google.com" || h.hasSuffix(".google.com")
+            || h == "youtube.com" || h.hasSuffix(".youtube.com")
     }
 }

@@ -48,7 +48,33 @@ public final class OfflineStore {
     public static func sanitize(_ s: String) -> String {
         let bad = CharacterSet(charactersIn: "/\\?%*|\"<>:")
         var o = s.components(separatedBy: bad).joined(separator: "_")
+        // Strip control characters (U+0000-U+001F, U+007F-U+009F).
+        o = String(o.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) })
+        // Reject path traversal sequences.
+        while o.contains("..") {
+            o = o.replacingOccurrences(of: "..", with: "__")
+        }
+        // Trim trailing dots/spaces (Windows/Finder-unsafe).
+        while o.hasSuffix(".") || o.hasSuffix(" ") {
+            o = String(o.dropLast())
+        }
         if o.count > 200 { o = String(o.prefix(200)) }
+        // Re-trim in case the cap left a trailing dot/space.
+        while o.hasSuffix(".") || o.hasSuffix(" ") {
+            o = String(o.dropLast())
+        }
+        if o.isEmpty { return "_" }
         return o
+    }
+
+    /// Validates Spotify track IDs for DownloadManager: ^[A-Za-z0-9]{8,64}$.
+    public static func isValidTrackId(_ s: String) -> Bool {
+        guard (8...64).contains(s.count) else { return false }
+        for c in s.unicodeScalars {
+            let v = c.value
+            let ok = (v >= 48 && v <= 57) || (v >= 65 && v <= 90) || (v >= 97 && v <= 122)
+            if !ok { return false }
+        }
+        return true
     }
 }

@@ -45,7 +45,8 @@ public final class SpotifyBridge: NSObject {
         case "deferMessage":
             let msg = (args.first as? String) ?? ""
             if msg == "adblock" { return } // silent
-            DispatchQueue.main.async { ToastCenter.show(msg == "unlock" ? "Player unlocked" : msg) }
+            let display = msg == "unlock" ? "Player unlocked" : (msg == "reload" ? "Reloading..." : msg)
+            DispatchQueue.main.async { ToastCenter.show(display) }
         case "cssInjected", "wakeUp", "wakeOff", "manageTShut", "manageTSleep":
             break // stubs (Android no-ops)
         case "dbg":
@@ -100,16 +101,40 @@ public final class SpotifyBridge: NSObject {
     // MARK: - nFetch (synchronous Spotify-API fetch w/ cookie sync, desktop headers)
 
     private func nFetch(urlString: String, optsJson: String, resolverId: String) async {
+        guard Self.isValidResolverId(resolverId) else { return }
         let result = await fetchSync(urlString: urlString, optsJson: optsJson)
+        // Single-quote-escape so the JSON payload can be resolved as a JS
+        // single-quoted string literal (no backtick/${} interpolation).
         let escaped = result
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")
             .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+            .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
         let js = "(function(){var r=window.__splNFetchResolvers||{};var f=r['\(resolverId)'];if(f){delete r['\(resolverId)'];try{f('\(escaped)');}catch(e){}}})();"
-        // Note: result is a JSON string of {status,body,headers}; resolve raw.
-        let raw = result.replacingOccurrences(of: "`", with: "\\`")
-        let js2 = "(function(){var r=window.__splNFetchResolvers||{};var f=r['\(resolverId)'];if(f){delete r['\(resolverId)'];try{f(`\(raw)`);}catch(e){}}})();"
-        _ = js; await MainActor.run { self.webView?.evaluateJavaScript(js2, completionHandler: nil) }
+        await MainActor.run { self.webView?.evaluateJavaScript(js, completionHandler: nil) }
+    }
+
+    /// ^[A-Za-z0-9_-]{1,64}$ — resolver IDs come from page JS; reject anything
+    /// else so interpolation into r['...'] cannot break out of the string.
+    private static func isValidResolverId(_ s: String) -> Bool {
+        guard (1...64).contains(s.count) else { return false }
+        for c in s.unicodeScalars {
+            let v = c.value
+            let ok = (v >= 48 && v <= 57) || (v >= 65 && v <= 90) || (v >= 97 && v <= 122) || v == 95 || v == 45
+            if !ok { return false }
+        }
+        return true
+    }
+
+    /// Spotify-only allow-list: spotify.com + subdomains, scdn.co + subdomains.
+    /// InnerTube has its own client; youtubei is never allowed here.
+    private static func isAllowedNFetchHost(_ host: String?) -> Bool {
+        guard let h = host?.lowercased(), !h.isEmpty else { return false }
+        if h == "spotify.com" || h.hasSuffix(".spotify.com") { return true }
+        if h == "scdn.co" || h.hasSuffix(".scdn.co") { return true }
+        return false
     }
 
     func fetchSync(urlString: String, optsJson: String) async -> String {
@@ -117,7 +142,12 @@ public final class SpotifyBridge: NSObject {
             let o: [String: Any] = ["status": 0, "body": "\(e)", "headers": [:]]
             return (try? String(data: JSONSerialization.data(withJSONObject: o), encoding: .utf8)) ?? "{\"status\":0,\"body\":\"error\",\"headers\":{}}"
         }
+        func blocked() -> String {
+            let o: [String: Any] = ["status": 0, "body": "blocked host", "headers": [:]]
+            return (try? String(data: JSONSerialization.data(withJSONObject: o), encoding: .utf8)) ?? "{\"status\":0,\"body\":\"blocked host\",\"headers\":{}}"
+        }
         guard let url = URL(string: urlString) else { return err(URLError(.badURL)) }
+        guard Self.isAllowedNFetchHost(url.host) else { return blocked() }
         var method = "GET", body: String? = nil, headers: [String: String] = [:]
         if let data = optsJson.data(using: .utf8),
            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -126,7 +156,8 @@ public final class SpotifyBridge: NSObject {
             headers = (obj["headers"] as? [String: String]) ?? [:]
         }
         let filtered: Set<String> = ["x-requested-with", "sec-ch-ua-full-version-list",
-            "sec-ch-ua-platform-version", "sec-ch-ua-arch", "sec-ch-ua-bitness", "sec-ch-ua-model"]
+            "sec-ch-ua-platform-version", "sec-ch-ua-arch", "sec-ch-ua-bitness", "sec-ch-ua-model",
+            "cookie", "authorization", "host"]
         var req = URLRequest(url: url, timeoutInterval: Constants.nFetchConnectTimeout)
         req.httpMethod = method
         for (k, v) in headers where !filtered.contains(k.lowercased()) { req.setValue(v, forHTTPHeaderField: k) }
@@ -138,7 +169,7 @@ public final class SpotifyBridge: NSObject {
             req.setValue(Constants.origin, forHTTPHeaderField: "Origin")
             req.setValue(Constants.origin + "/", forHTTPHeaderField: "Referer")
         }
-        // Cookie sync from WKWebView store
+        // Cookie sync from WKWebView store (jar wins; caller Cookie is filtered above).
         if let wv = webView {
             let cookies = await wv.configuration.websiteDataStore.httpCookieStore.allCookiesAsync()
             let jar = cookies.filter { url.host?.hasSuffix($0.domain.trimmingCharacters(in: CharacterSet(charactersIn: "."))) ?? false }
@@ -150,11 +181,19 @@ public final class SpotifyBridge: NSObject {
         do {
             let (data, resp) = try await session.data(for: req)
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
-            // Set-Cookie sync back into WebView
+            // Set-Cookie sync back into WebView: one full header value at a
+            // time (never comma-split; Expires dates contain commas).
             if let http = resp as? HTTPURLResponse, let wv = webView {
                 for (k, v) in http.allHeaderFields where "\(k)".lowercased() == "set-cookie" {
-                    for part in ("\(v)".components(separatedBy: ",")) {
-                        if let c = HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": part], for: url).first {
+                    if let arr = v as? [String] {
+                        for raw in arr {
+                            for c in HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": raw], for: url) {
+                                await wv.configuration.websiteDataStore.httpCookieStore.setCookieAsync(c)
+                            }
+                        }
+                    } else {
+                        let raw = "\(v)"
+                        for c in HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": raw], for: url) {
                             await wv.configuration.websiteDataStore.httpCookieStore.setCookieAsync(c)
                         }
                     }
