@@ -74,8 +74,8 @@ public enum WebViewBus {
 public typealias WKWebViewStub = WKWebView
 
 extension UIImage {
-    func scaled(to max: CGFloat) -> UIImage {
-        let s = min(1, max / max(size.width, size.height))
+    func scaled(to limit: CGFloat) -> UIImage {
+        let s = min(1, limit / max(size.width, size.height))
         if s >= 1 { return self }
         let sz = CGSize(width: size.width*s, height: size.height*s)
         return UIGraphicsImageRenderer(size: sz).image { _ in draw(in: CGRect(origin: .zero, size: sz)) }
