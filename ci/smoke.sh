@@ -1,6 +1,6 @@
 #!/bin/sh
 # Smoke build for macOS with Xcode installed.
-# Usage: sh ci/smoke.sh   (runs from repo root: musemobile-ios/)
+# Usage: sh ci/smoke.sh   (runs from repo root)
 set -e
 cd "$(dirname "$0")/.."
 xcodebuild -project MuseMobileiOS.xcodeproj \

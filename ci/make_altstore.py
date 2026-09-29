@@ -17,7 +17,7 @@ APP_NAME = "MuseMobile"
 BUNDLE_ID = "com.musemobile.ios"
 VERSION = "1.1.4"
 TINT = "1DB954"
-ICON_PATH = "musemobile-ios/MuseMobileiOS/Assets.xcassets/AppIcon.appiconset/icon-1024.png"
+ICON_PATH = "MuseMobileiOS/Assets.xcassets/AppIcon.appiconset/icon-1024.png"
 
 p = argparse.ArgumentParser()
 p.add_argument("--ipa", required=True, help="path to signed .ipa")

@@ -22,7 +22,7 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-version
       - name: Build (unsigned)
         run: |
-          xcodebuild -project musemobile-ios/MuseMobileiOS.xcodeproj \
+          xcodebuild -project MuseMobileiOS.xcodeproj \
             -scheme MuseMobileiOS \
             -configuration Debug \
             -destination 'generic/platform=iOS' \
