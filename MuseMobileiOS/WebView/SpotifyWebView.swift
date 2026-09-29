@@ -17,7 +17,10 @@ public struct SpotifyWebView: UIViewRepresentable {
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         config.allowsAirPlayForMediaPlayback = true
-        config.preferences.javaScriptEnabled = true
+        config.preferences.javaScriptCanOpenWindowsAutomatically = false
+        if #available(iOS 14.0, *) {
+            config.defaultWebpagePreferences.allowsContentJavaScript = true
+        }
         // AndBridge handler
         config.userContentController.add(context.coordinator, name: "AndBridge")
         // Bridge shim at document start (bundled flat, no folder reference)
@@ -42,7 +45,7 @@ public struct SpotifyWebView: UIViewRepresentable {
         let loggedIn = AppSettings.bool(.loggedIn)
         wv.load(URLRequest(url: loggedIn ? Constants.spotifyHome : Constants.spotifyLogin))
         // Background parking hooks (__splBg + __splWas{ Pfint,Afint,Cssint })
-        observeLifecycle(coordinator)
+        observeLifecycle(context.coordinator)
         return wv
     }
 

@@ -17,10 +17,12 @@ public final class LocalProxyManager {
 
     public func start() throws {
         let params = NWParameters.tcp
-        listener = try NWListener(using: params, on: .loopback)
-        listener?.newConnectionHandler = { conn in conn.start(queue: .global()) }
-        listener?.start(queue: .global())
-        port = 8080 // ephemeral in production: read back actual port
+        params.requiredInterfaceType = .loopback
+        let l = try NWListener(using: params, on: .any) // ephemeral port
+        l.newConnectionHandler = { conn in conn.start(queue: .global()) }
+        l.start(queue: .global())
+        listener = l
+        port = l.port?.rawValue ?? 0
     }
     public func stop() { listener?.cancel(); listener = nil }
     public var proxyConfig: [AnyHashable: Any] {
