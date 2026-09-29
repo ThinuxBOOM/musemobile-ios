@@ -1,11 +1,27 @@
 # MuseMobile iOS (v1.1.4 / build 14)
 
+![smoke](https://github.com/ThinuxBOOM/musemobile-ios/actions/workflows/smoke.yml/badge.svg)
+
 Swift/SwiftUI + WKWebView port of [musemobile](https://github.com/ThinuxBOOM/musemobile)
 (Android: Kotlin, WebView wrapping `https://open.spotify.com/`).
 
 > ~60% of product intelligence lives in JS — `Resources/JS/*.js` are **verbatim
 > ports** of Android `webview/injections/*.kt` (38 payloads, extracted by script).
 > Native layers below reimplement the contracts in `Ref` brief §§1–8.
+
+## Status: CI green, simulator-verified
+
+All three `smoke` jobs pass on every push to `main`, with no iPhone or Mac needed:
+
+- `checks` — consistency + Swift logic tests green
+- `build` — unsigned `.ipa` artifact (sideload via Sideloadly, path A below)
+- `simtest` — app launches in iPhone Simulator, stays alive, loads Spotify's
+  full desktop login page ("Welcome back") in the WKWebView — screenshot saved
+  as the `simulator-screenshot` artifact
+
+Proven without hardware: launch, router, login-page serve + layout, JS injection
+executing, updater reaching GitHub. Still needs a physical iPhone: login session,
+DRM playback, lockscreen, adblock behavior, downloads (`SMOKE_TEST.md` §2–5).
 
 ## Layout
 
@@ -36,7 +52,15 @@ MuseMobileiOS/
   UI/MainView.swift              webview + timer (actPlayPause) + PiP hooks
   UI/SettingsView.swift          all settings
   UI/OfflineView.swift           AVPlayer library
+  Assets.xcassets                AppIcon (placeholder: dark tile + green disc)
+  Resources/silent.wav           1s PCM silence (placeholder for silent.mp3, §Known limitations)
 ```
+
+Project root: `MuseMobileiOS.xcodeproj` (generated, shared `MuseMobileiOS` scheme),
+`ci/` (`smoke.sh`, `archive.sh`, export options, `make_altstore.py`,
+`check_consistency.py`, `logic_tests/`), `.github/workflows/smoke.yml`
+(`checks` + `build` + `simtest`), `SMOKE_TEST.md`,
+`RELEASE_NOTES_1.1.4-ios-smoke1.md`.
 
 ## Bring-up (Xcode, macOS)
 
@@ -128,10 +152,23 @@ Needs a physical iPhone: login session, audio/DRM playback, lockscreen, adblock 
   Plan AltStore / TestFlight / dev-signing from day one.
 - WKWebView ignores per-view proxies — API traffic goes via native URLSession
   (`mngFetch`); proxy mode only affects native session + resource loader.
-- `silent.mp3`: add a 1s silent MPEG (e.g. `ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 1 -q:a 9 silent.mp3`)
-  at `Resources/silent.mp3` and return it from the resource loader for cancelled ad audio.
+- `silent.wav` ships instead of `silent.mp3` (no ffmpeg on the build host).
+  Ad audio is cancelled in `decidePolicyFor` + skipped page-side, so no asset
+  plays yet. Replace with
+  `ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 1 -q:a 9 silent.mp3`
+  when wiring the `AVAssetResourceLoaderDelegate` redirect.
 - WebSocket dealer traffic bypasses fetch shims — AdStateHook WS wrap is load-bearing.
 - Firebase skipped (Android ships collection-disabled; 3 playback-failure paths → os_log).
+
+## Known limitations (smoke-1)
+
+- Updater checks `ThinuxBOOM/musemobile` (Android repo) releases — point it at
+  this repo before publishing an iOS release, or every install will compare
+  against Android tags.
+- YouTube cipher/PoToken is a staged stub (`YTPlayerResolver` naive parse) —
+  signature-walled tracks will fail to resolve; downloads are the least-tested path.
+- No CarPlay entitlement — `CarPlayManager` is backend-only until one is provisioned.
+- Sideload-only distribution (free Apple ID: 3 apps, 7-day refresh).
 
 ## Next steps
 
