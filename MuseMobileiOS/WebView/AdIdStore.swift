@@ -10,7 +10,10 @@ public final class AdIdStore: @unchecked Sendable {
     private var published: [String] = []
     private static let maxIDs = 32
 
-    public func addAll(_ candidates: [String]) {
+    /// Adds validated candidates. Returns true when at least one new ID was
+    /// stored (callers use this to rate-limit logging).
+    @discardableResult
+    public func addAll(_ candidates: [String]) -> Bool {
         lock.lock(); defer { lock.unlock() }
         var changed = false
         for raw in candidates {
@@ -21,6 +24,7 @@ public final class AdIdStore: @unchecked Sendable {
         }
         while ids.count > Self.maxIDs { ids.removeFirst() }
         if changed { published = ids.items }
+        return changed
     }
 
     /// Hot path — lock-free snapshot scan.
