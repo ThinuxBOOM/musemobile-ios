@@ -8,9 +8,9 @@ on:
 
 jobs:
   build:
-    # Unsigned build check only (no Team, no signing). Proves the project
-    # compiles on modern Xcode; device install still needs a signed IPA
-    # from ci/archive.sh on a Mac.
+    # Unsigned build + IPA packaging (no Team, no signing). Sideloadly /
+    # AltStore re-sign the unsigned IPA on install with your own Apple ID,
+    # so no Mac is needed to get it on a phone.
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -26,5 +26,16 @@ jobs:
             -scheme MuseMobileiOS \
             -configuration Debug \
             -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             build
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p pkg/Payload
+          cp -R build/DerivedData/Build/Products/Debug-iphoneos/MuseMobileiOS.app pkg/Payload/
+          cd pkg && zip -r ../MuseMobileiOS-unsigned.ipa Payload
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: MuseMobileiOS-unsigned
+          path: MuseMobileiOS-unsigned.ipa

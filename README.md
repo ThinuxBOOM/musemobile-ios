@@ -56,8 +56,20 @@ sh ci/smoke.sh   # unsigned build check, no signing needed
 
 ## Ship to iPhone (sideload — no App Store)
 
-Tapping an IPA in Safari installs nothing. iOS needs a **signed** app
-installed via Xcode/AltStore. Cable-install first (§Bring-up); then:
+Tapping an IPA in Safari installs nothing. iOS needs a **signed** app.
+Two paths — pick one:
+
+### A. No Mac: CI artifact + Sideloadly (Windows OK)
+
+1. Push to `main` → Actions → `smoke` run → download the
+   `MuseMobileiOS-unsigned` artifact (`MuseMobileiOS-unsigned.ipa`).
+2. Install [Sideloadly](https://sideloadly.io/) on your PC, plug in the iPhone,
+   drag the IPA in, enter your Apple ID (a spare/burner ID is prudent —
+   free IDs work, 3-app limit, 7-day refresh).
+3. iPhone: enable **Developer Mode** (Settings → Privacy & Security, iOS 16+),
+   then trust your Apple ID under VPN & Device Management.
+
+### B. With a Mac: signed IPA + AltStore
 
 1. Build the signed IPA (macOS). Put your Team ID
    (developer.apple.com → Membership, 10 chars) in
