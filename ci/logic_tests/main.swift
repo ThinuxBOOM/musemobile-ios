@@ -1,5 +1,7 @@
 // Hardware-free logic tests: compiled with the REAL sources via
-//   swiftc <sources> ci/logic_tests/LogicTestsMain.swift -o logictests && ./logictests
+//   swiftc <sources> ci/logic_tests/main.swift -o logictests && ./logictests
+// NOTE: this file must stay named main.swift — swiftc only allows top-level
+// code in the entry-point file.
 // Covers the pure-logic ports: AdIdStore, AdBlocker (+pipeline rule),
 // JSStripper, Updater.isNewer, OfflineStore.sanitize, Constants.retry,
 // AppSettings defaults. Exit 0 = all pass.

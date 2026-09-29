@@ -25,7 +25,7 @@ jobs:
             MuseMobileiOS/Core/AppSettings.swift \
             MuseMobileiOS/Core/Constants.swift \
             MuseMobileiOS/Offline/OfflineStore.swift \
-            ci/logic_tests/LogicTestsMain.swift
+            ci/logic_tests/main.swift
           /tmp/logictests
   build:
     # Unsigned build + IPA packaging (no Team, no signing). Sideloadly /
