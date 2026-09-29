@@ -1,0 +1,30 @@
+name: smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Unsigned build check only (no Team, no signing). Proves the project
+    # compiles on modern Xcode; device install still needs a signed IPA
+    # from ci/archive.sh on a Mac.
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 15
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+      - name: Show versions
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+      - name: Build (unsigned)
+        run: |
+          xcodebuild -project musemobile-ios/MuseMobileiOS.xcodeproj \
+            -scheme MuseMobileiOS \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
