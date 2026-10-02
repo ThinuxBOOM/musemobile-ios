@@ -8,7 +8,7 @@ import Network
 /// (LastUpdateCheck ms epoch), skip when expensive/constrained.
 public enum Updater {
     public static var owner = "ThinuxBOOM"
-    public static var repo = "musemobile"
+    public static var repo = "musemobile-ios"
 
     public struct Release: Decodable {
         public var tag_name: String; public var body: String?
